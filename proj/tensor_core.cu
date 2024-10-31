@@ -10,6 +10,16 @@ const int N = 16;
 const int K = 16;
 const int TILE_DIM = 1024; // GEMM size
 
+#define CHECK_CUDA_ERROR(call) \
+    { \
+        cudaError_t err = call; \
+        if (err != cudaSuccess) { \
+            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " \
+                      << cudaGetErrorString(err) << std::endl; \
+            exit(err); \
+        } \
+    }
+
 __global__ void tensorCoreGemm1024x1024x1024(half *a, half *b, float *c, int TILE_DIM) {
     __shared__ half shared_a[M * K];
     __shared__ half shared_b[K * N];
@@ -46,9 +56,9 @@ int main() {
     half *a, *b;
     float *c;
 
-    cudaMalloc(&a, MATRIX_SIZE_A);
-    cudaMalloc(&b, MATRIX_SIZE_B);
-    cudaMalloc(&c, MATRIX_SIZE_C);
+    CHECK_CUDA_ERROR(cudaMalloc(&a, MATRIX_SIZE_A));
+    CHECK_CUDA_ERROR(cudaMalloc(&b, MATRIX_SIZE_B));
+    CHECK_CUDA_ERROR(cudaMalloc(&c, MATRIX_SIZE_C));
 
     // Host-side arrays for initialization and verification
     half *host_a = new half[TILE_DIM * TILE_DIM];
@@ -58,33 +68,38 @@ int main() {
     for (int i = 0; i < TILE_DIM * TILE_DIM; ++i) {
         host_a[i] = __float2half(1.0f);  // Fill with 1s
         host_b[i] = __float2half(1.0f);  // Fill with 1s
+        host_c[i] = 0.0f;                // Initialize C to zero
     }
 
     // Copy initialized arrays to device
-    cudaMemcpy(a, host_a, MATRIX_SIZE_A, cudaMemcpyHostToDevice);
-    cudaMemcpy(b, host_b, MATRIX_SIZE_B, cudaMemcpyHostToDevice);
+    CHECK_CUDA_ERROR(cudaMemcpy(a, host_a, MATRIX_SIZE_A, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(b, host_b, MATRIX_SIZE_B, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(c, host_c, MATRIX_SIZE_C, cudaMemcpyHostToDevice));
 
     dim3 grid(TILE_DIM / M, TILE_DIM / N);
     dim3 block(M, N);
 
     // Initialize CUDA events for timing
     cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    CHECK_CUDA_ERROR(cudaEventCreate(&start));
+    CHECK_CUDA_ERROR(cudaEventCreate(&stop));
 
     // Record start time
-    cudaEventRecord(start);
+    CHECK_CUDA_ERROR(cudaEventRecord(start));
 
     // Launch the GEMM kernel
     tensorCoreGemm1024x1024x1024<<<grid, block>>>(a, b, c, TILE_DIM);
 
+    // Check for errors after kernel launch
+    CHECK_CUDA_ERROR(cudaGetLastError());
+
     // Record stop time
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    CHECK_CUDA_ERROR(cudaEventRecord(stop));
+    CHECK_CUDA_ERROR(cudaEventSynchronize(stop));
 
     // Calculate the elapsed time in milliseconds
     float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    CHECK_CUDA_ERROR(cudaEventElapsedTime(&milliseconds, start, stop));
 
     // Convert time to nanoseconds
     float nanoseconds = milliseconds * 1e6;
@@ -97,7 +112,7 @@ int main() {
     std::cout << "Achieved TFLOPS: " << tflops << std::endl;
 
     // Copy result matrix C back to host for verification
-    cudaMemcpy(host_c, c, MATRIX_SIZE_C, cudaMemcpyDeviceToHost);
+    CHECK_CUDA_ERROR(cudaMemcpy(host_c, c, MATRIX_SIZE_C, cudaMemcpyDeviceToHost));
 
     // Verify correctness by checking if each element in C is 1024
     bool correct = true;
@@ -119,11 +134,11 @@ int main() {
     delete[] host_a;
     delete[] host_b;
     delete[] host_c;
-    cudaFree(a);
-    cudaFree(b);
-    cudaFree(c);
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    CHECK_CUDA_ERROR(cudaFree(a));
+    CHECK_CUDA_ERROR(cudaFree(b));
+    CHECK_CUDA_ERROR(cudaFree(c));
+    CHECK_CUDA_ERROR(cudaEventDestroy(start));
+    CHECK_CUDA_ERROR(cudaEventDestroy(stop));
 
     return 0;
 }
