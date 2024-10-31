@@ -73,10 +73,9 @@ int main() {
     cudaEventElapsedTime(&milliseconds, start, stop);
 
     // Calculate FLOPS
-    int64_t num_operations = 2 * TILE_DIM * TILE_DIM * TILE_DIM; // 2 * M * N * K for GEMM
+    long long int num_operations = 2LL * TILE_DIM * TILE_DIM * TILE_DIM; // Use 64-bit to avoid overflow
     float tflops = (num_operations / (milliseconds / 1000.0f)) / 1e12; // TFLOPS
 
-    std::cout << "num_operations: " << num_operations << std::endl;
     std::cout << "Time: " << milliseconds << " ms" << std::endl;
     std::cout << "Achieved TFLOPS: " << tflops << std::endl;
 
