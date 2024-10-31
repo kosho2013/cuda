@@ -50,6 +50,20 @@ int main() {
     cudaMalloc(&b, MATRIX_SIZE_B);
     cudaMalloc(&c, MATRIX_SIZE_C);
 
+    // Host-side arrays for initialization and verification
+    half *host_a = new half[TILE_DIM * TILE_DIM];
+    half *host_b = new half[TILE_DIM * TILE_DIM];
+    float *host_c = new float[TILE_DIM * TILE_DIM];
+
+    for (int i = 0; i < TILE_DIM * TILE_DIM; ++i) {
+        host_a[i] = __float2half(1.0f);  // Fill with 1s
+        host_b[i] = __float2half(1.0f);  // Fill with 1s
+    }
+
+    // Copy initialized arrays to device
+    cudaMemcpy(a, host_a, MATRIX_SIZE_A, cudaMemcpyHostToDevice);
+    cudaMemcpy(b, host_b, MATRIX_SIZE_B, cudaMemcpyHostToDevice);
+
     dim3 grid(TILE_DIM / M, TILE_DIM / N);
     dim3 block(M, N);
 
@@ -68,19 +82,43 @@ int main() {
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
-    // Calculate the elapsed time
+    // Calculate the elapsed time in milliseconds
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    // Calculate FLOPS
-    long long int num_operations = 2LL * TILE_DIM * TILE_DIM * TILE_DIM; // Use 64-bit to avoid overflow
-    float tflops = (num_operations / (milliseconds / 1000.0f)) / 1e12; // TFLOPS
+    // Convert time to nanoseconds
+    float nanoseconds = milliseconds * 1e6;
 
-    std::cout << "num_operations: " << num_operations << std::endl;
-    std::cout << "Time: " << milliseconds << " ms" << std::endl;
+    // Calculate FLOPS
+    long long int num_operations = 2LL * TILE_DIM * TILE_DIM * TILE_DIM;
+    float tflops = (num_operations / (nanoseconds / 1e9)) / 1e12; // TFLOPS
+
+    std::cout << "Time: " << nanoseconds << " ns" << std::endl;
     std::cout << "Achieved TFLOPS: " << tflops << std::endl;
 
+    // Copy result matrix C back to host for verification
+    cudaMemcpy(host_c, c, MATRIX_SIZE_C, cudaMemcpyDeviceToHost);
+
+    // Verify correctness by checking if each element in C is 1024
+    bool correct = true;
+    float expected_value = 1024.0f;
+    for (int i = 0; i < TILE_DIM * TILE_DIM; ++i) {
+        if (abs(host_c[i] - expected_value) > 1e-3) {  // Allow small floating-point tolerance
+            correct = false;
+            std::cout << "Mismatch at index " << i << ": " << host_c[i] << " != " << expected_value << std::endl;
+            break;
+        }
+    }
+    if (correct) {
+        std::cout << "Matrix multiplication result is correct!" << std::endl;
+    } else {
+        std::cout << "Matrix multiplication result is incorrect." << std::endl;
+    }
+
     // Cleanup
+    delete[] host_a;
+    delete[] host_b;
+    delete[] host_c;
     cudaFree(a);
     cudaFree(b);
     cudaFree(c);
