@@ -1,0 +1,4 @@
+Step 1) Make sure CUDA is installed (Check guides on the course site)
+Step 2) Open command line and cd into directory containing this file
+Step 3) compile with command: nvcc query.cu -o query
+Step 4) Run with command: ./query
