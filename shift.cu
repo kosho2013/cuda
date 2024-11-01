@@ -15,7 +15,7 @@ __global__ void shiftLeftKernel(int *arr, int n)
 int main()
 {
     const int n = 20;
-    int* arr;
+    int* arr, d_arr;
     int size = n * sizeof(int);
 
     for (int i = 0; i < n; i++)
