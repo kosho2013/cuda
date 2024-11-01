@@ -1,44 +1,48 @@
+#include <stdio.h>
 #include <cuda_runtime.h>
-#include <iostream>
 
-__global__ void shiftLeftKernel(int *arr, int n)
+__global__ void add(int *a, int *b, int *c, int n)
 {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < n - 1) {
-        arr[idx] = arr[idx + 1];
-    } else if (idx == n - 1) {
-        // Handle the last element separately
-        arr[idx] = arr[0];
-    }
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < n) 
+        c[i] = a[i] + b[i];
 }
 
-int main()
-{
-    const int n = 20;
-    int* arr, d_arr;
+int main() {
+    int n = 10;
+    int *a, *b, *c;
+    int *d_a, *d_b, *d_c;
     int size = n * sizeof(int);
 
-    for (int i = 0; i < n; i++)
-    {
-        arr[i] = i;
-    }
+    a = (int *)malloc(size);
+    b = (int *)malloc(size);
+    c = (int *)malloc(size);
 
-    cudaMalloc(&d_arr, size);
-    cudaMemcpy(d_arr, arr, size, cudaMemcpyHostToDevice);
-
-    int threadsPerBlock = 1024;
-    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    shiftLeftKernel<<<blocksPerGrid, threadsPerBlock>>>(d_arr, n);
-
-    cudaMemcpy(arr, d_arr, size, cudaMemcpyDeviceToHost);
-    cudaFree(d_arr);
-
-
-    std::cout << "Shifted array: ";
     for (int i = 0; i < n; i++) {
-        std::cout << arr[i] << " ";
+        a[i] = i;
+        b[i] = i * 2;
     }
-    std::cout << std::endl;
+
+    cudaMalloc((void **)&d_a, size);
+    cudaMalloc((void **)&d_b, size);
+    cudaMalloc((void **)&d_c, size);
+
+    cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, size, cudaMemcpyHostToDevice);
+
+    add<<<1, n>>>(d_a, d_b, d_c, n);
+
+    cudaMemcpy(c, d_c, size, cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < n; i++)
+        printf("%d + %d = %d\n", a[i], b[i], c[i]);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    free(a);
+    free(b);
+    free(c);
 
     return 0;
 }
