@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 
-__global__ void add(int *a, int *b, int *c, int n)
+__device__ void add(int *a, int *b, int *c, int n)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < n)
