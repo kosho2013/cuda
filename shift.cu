@@ -1,7 +1,8 @@
 #include <cuda_runtime.h>
 #include <iostream>
 
-__global__ void shiftLeftKernel(int *arr, int n) {
+__global__ void shiftLeftKernel(int *arr, int n)
+{
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < n - 1) {
         arr[idx] = arr[idx + 1];
@@ -11,26 +12,27 @@ __global__ void shiftLeftKernel(int *arr, int n) {
     }
 }
 
-void shiftLeft(int *arr, int n) {
-    int *d_arr;
-    size_t size = n * sizeof(int);
+int main()
+{
+    const int n = 20;
+    int* arr;
+    int size = n * sizeof(int);
+
+    for (int i = 0; i < n; i++)
+    {
+        arr[i] = i;
+    }
 
     cudaMalloc(&d_arr, size);
     cudaMemcpy(d_arr, arr, size, cudaMemcpyHostToDevice);
 
-    int threadsPerBlock = 256;
+    int threadsPerBlock = 1024;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
     shiftLeftKernel<<<blocksPerGrid, threadsPerBlock>>>(d_arr, n);
 
     cudaMemcpy(arr, d_arr, size, cudaMemcpyDeviceToHost);
     cudaFree(d_arr);
-}
 
-int main() {
-    const int n = 10;
-    int arr[n] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-    shiftLeft(arr, n);
 
     std::cout << "Shifted array: ";
     for (int i = 0; i < n; i++) {
