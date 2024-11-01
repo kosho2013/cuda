@@ -4,8 +4,10 @@
 __global__ void add(int *a, int *b, int *c, int n)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i < n) 
+    if (i < n)
+    {
         c[i] = a[i] + b[i];
+    }
 }
 
 int main() {
